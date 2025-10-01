@@ -40,7 +40,7 @@ export default function LoginPage() {
             // Now, redirect based on user role.
             const userRole = data.user?.role;
             if (userRole === 'student') {
-                router.push('/student/dashboard');
+                router.push('/student/jobs');
             } else if (userRole === 'recruiter') {
                 router.push('/recruiter/dashboard');
             } else {

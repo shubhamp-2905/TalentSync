@@ -1,319 +1,277 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
+'use client';
+
+import { useEffect, useState, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  GraduationCap, 
-  Briefcase, 
-  Award,
-  Plus,
-  Edit,
-  Download,
-  ExternalLink
-} from "lucide-react"
+  User, Mail, Phone, MapPin, GraduationCap, Briefcase, Award,
+  Plus, Edit, Download, ExternalLink, Loader2
+} from "lucide-react";
+
+// --- Define Types for Profile Data ---
+interface IEducation {
+  institution?: string;
+  degree?: string;
+  fieldOfStudy?: string;
+  startDate?: string;
+  endDate?: string;
+  gpa?: string;
+  description?: string;
+}
+
+interface IExperience {
+  title?: string;
+  company?: string;
+  location?: string;
+  startDate?: string;
+  endDate?: string;
+  description?: string;
+}
+
+interface IProject {
+  name?: string;
+  description?: string;
+  link?: string;
+}
+
+interface IUserProfile {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  location?: string;
+  summary?: string;
+  profileTitle?: string;
+  profilePictureUrl?: string;
+  skills?: string[];
+  education?: IEducation[];
+  experience?: IExperience[];
+  projects?: IProject[];
+  socialLinks?: {
+    linkedIn?: string;
+    github?: string;
+    portfolio?: string;
+  };
+}
+
+// --- Main Component ---
 
 export default function StudentProfile() {
-  const skills = [
-    "React", "JavaScript", "TypeScript", "Node.js", "Python", 
-    "SQL", "Git", "AWS", "MongoDB", "Express.js"
-  ]
+  const [profile, setProfile] = useState<IUserProfile | null>(null);
+  const [editableProfile, setEditableProfile] = useState<IUserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const experiences = [
-    {
-      title: "Frontend Developer Intern",
-      company: "TechStartup Inc.",
-      duration: "Jun 2023 - Aug 2023",
-      description: "Developed responsive web applications using React and TypeScript. Collaborated with design team to implement user-friendly interfaces."
-    },
-    {
-      title: "Web Development Freelancer",
-      company: "Self-employed",
-      duration: "Jan 2023 - Present",
-      description: "Created custom websites for small businesses using modern web technologies. Managed client relationships and project timelines."
-    }
-  ]
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setIsLoading(true);
+      setError('');
+      try {
+        const res = await fetch('/api/profile');
+        if (!res.ok) throw new Error('Failed to fetch profile data.');
+        const data = await res.json();
+        setProfile(data.user);
+        setEditableProfile(data.user);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
 
-  const projects = [
-    {
-      name: "E-commerce Platform",
-      description: "Full-stack web application built with React, Node.js, and MongoDB",
-      link: "https://github.com/johndoe/ecommerce"
-    },
-    {
-      name: "Task Management App",
-      description: "React Native mobile app with real-time synchronization",
-      link: "https://github.com/johndoe/taskapp"
-    },
-    {
-      name: "Data Visualization Dashboard",
-      description: "Interactive dashboard built with D3.js and Python Flask",
-      link: "https://github.com/johndoe/dashboard"
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    if (editableProfile) {
+      setEditableProfile({ ...editableProfile, [name]: value });
     }
-  ]
+  };
+  
+  const handleNestedChange = (section: 'education' | 'experience' | 'projects', index: number, e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    if (editableProfile) {
+      const updatedSection = [...(editableProfile[section] || [])] as any[];
+      updatedSection[index] = { ...updatedSection[index], [name]: value };
+      setEditableProfile({ ...editableProfile, [section]: updatedSection });
+    }
+  };
+
+  const addSectionItem = (section: 'education' | 'experience' | 'projects') => {
+    if (editableProfile) {
+      const newSection = [...(editableProfile[section] || []), {}];
+      setEditableProfile({ ...editableProfile, [section]: newSection as any });
+    }
+  };
+
+  const removeSectionItem = (section: 'education' | 'experience' | 'projects', index: number) => {
+    if (editableProfile) {
+      const newSection = [...(editableProfile[section] || [])];
+      newSection.splice(index, 1);
+      setEditableProfile({ ...editableProfile, [section]: newSection as any });
+    }
+  };
+
+  const handleSave = async () => {
+    if (!editableProfile) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/profile/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editableProfile),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to save profile.');
+      }
+      const data = await res.json();
+      setProfile(data.user);
+      setEditableProfile(data.user);
+      setIsEditing(false);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditToggle = () => isEditing ? handleSave() : setIsEditing(true);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('profilePicture', file);
+    try {
+      const res = await fetch('/api/profile/upload-picture', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('Upload failed');
+      const data = await res.json();
+      const newUrl = data.url;
+      setProfile(prev => prev ? { ...prev, profilePictureUrl: newUrl } : null);
+      setEditableProfile(prev => prev ? { ...prev, profilePictureUrl: newUrl } : null);
+    } catch (error) {
+      console.error(error);
+      setError('Failed to upload photo.');
+    }
+  };
+
+  if (isLoading && !profile) {
+    return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
+  if (error) {
+    return <div className="text-center text-red-500 p-4">{error}</div>;
+  }
+  if (!profile || !editableProfile) {
+    return <div className="text-center">Could not load profile.</div>;
+  }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 p-4 md:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-navy-800">My Profile</h1>
+          <h1 className="text-3xl font-bold">My Profile</h1>
           <p className="text-gray-600 mt-1">Manage your professional profile and showcase your skills</p>
         </div>
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Download Resume
-          </Button>
-          <Button size="sm">
-            <Edit className="h-4 w-4 mr-2" />
-            Edit Profile
+          <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-2" /> Download Resume</Button>
+          <Button size="sm" onClick={handleEditToggle} disabled={isLoading}>
+            {isLoading && isEditing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Edit className="h-4 w-4 mr-2" />}
+            {isEditing ? 'Save Profile' : 'Edit Profile'}
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Profile Info */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Basic Information */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <User className="h-5 w-5 mr-2" />
-                Personal Information
-              </CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="flex items-center"><User className="h-5 w-5 mr-2" />Personal Information</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" defaultValue="John" />
-                </div>
-                <div>
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" defaultValue="Doe" />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" defaultValue="john.doe@university.edu" />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" defaultValue="+1 (555) 123-4567" />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="location">Location</Label>
-                  <Input id="location" defaultValue="San Francisco, CA" />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="summary">Professional Summary</Label>
-                  <textarea
-                    id="summary"
-                    className="min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    defaultValue="Passionate computer science student with hands-on experience in full-stack development. Skilled in modern web technologies and eager to contribute to innovative projects in a dynamic team environment."
-                  />
-                </div>
+                <div><Label htmlFor="firstName">First Name</Label><Input id="firstName" name="firstName" value={editableProfile.firstName} onChange={handleProfileChange} readOnly={!isEditing} /></div>
+                <div><Label htmlFor="lastName">Last Name</Label><Input id="lastName" name="lastName" value={editableProfile.lastName} onChange={handleProfileChange} readOnly={!isEditing} /></div>
+                <div><Label htmlFor="email">Email</Label><Input id="email" type="email" value={editableProfile.email} readOnly disabled /></div>
+                <div><Label htmlFor="phone">Phone</Label><Input id="phone" name="phone" value={editableProfile.phone || ''} onChange={handleProfileChange} readOnly={!isEditing} /></div>
+                <div className="md:col-span-2"><Label htmlFor="location">Location</Label><Input id="location" name="location" value={editableProfile.location || ''} onChange={handleProfileChange} readOnly={!isEditing} /></div>
+                <div className="md:col-span-2"><Label htmlFor="summary">Professional Summary</Label><Textarea id="summary" name="summary" value={editableProfile.summary || ''} onChange={handleProfileChange} readOnly={!isEditing} className="min-h-[100px]" /></div>
               </div>
             </CardContent>
           </Card>
-
-          {/* Education */}
+          
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <GraduationCap className="h-5 w-5 mr-2" />
-                Education
-              </CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="flex items-center"><GraduationCap className="h-5 w-5 mr-2" />Education</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="border rounded-lg p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-semibold">Bachelor of Science in Computer Science</h3>
-                    <p className="text-gray-600">University of California, Berkeley</p>
-                    <p className="text-sm text-gray-500">Sep 2021 - May 2025 (Expected)</p>
-                    <p className="text-sm text-gray-600 mt-1">GPA: 3.8/4.0</p>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <Edit className="h-4 w-4" />
-                  </Button>
+              {editableProfile.education?.map((edu, index) => (
+                <div key={index} className="border rounded-lg p-4 space-y-2 relative">
+                  {isEditing && (<Button variant="destructive" size="sm" className="absolute top-2 right-2 px-2 h-6" onClick={() => removeSectionItem('education', index)}>Remove</Button>)}
+                  <div><Label>Degree</Label><Input name="degree" value={edu.degree || ''} onChange={(e) => handleNestedChange('education', index, e)} readOnly={!isEditing} /></div>
+                  <div><Label>Institution</Label><Input name="institution" value={edu.institution || ''} onChange={(e) => handleNestedChange('education', index, e)} readOnly={!isEditing} /></div>
                 </div>
-                <div className="mt-3">
-                  <p className="text-sm text-gray-600">
-                    <strong>Relevant Coursework:</strong> Data Structures, Algorithms, Database Systems, 
-                    Software Engineering, Machine Learning, Computer Networks
-                  </p>
-                </div>
-              </div>
-              <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Education
-              </Button>
+              ))}
+              {isEditing && <Button variant="outline" size="sm" onClick={() => addSectionItem('education')}><Plus className="h-4 w-4 mr-2" />Add Education</Button>}
             </CardContent>
           </Card>
 
-          {/* Experience */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Briefcase className="h-5 w-5 mr-2" />
-                Experience
-              </CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="flex items-center"><Briefcase className="h-5 w-5 mr-2" />Experience</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {experiences.map((exp, index) => (
-                <div key={index} className="border rounded-lg p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-semibold">{exp.title}</h3>
-                      <p className="text-gray-600">{exp.company}</p>
-                      <p className="text-sm text-gray-500">{exp.duration}</p>
-                    </div>
-                    <Button variant="ghost" size="sm">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-sm text-gray-700 mt-2">{exp.description}</p>
+              {editableProfile.experience?.map((exp, index) => (
+                <div key={index} className="border rounded-lg p-4 space-y-2 relative">
+                  {isEditing && (<Button variant="destructive" size="sm" className="absolute top-2 right-2 px-2 h-6" onClick={() => removeSectionItem('experience', index)}>Remove</Button>)}
+                  <div><Label>Job Title</Label><Input name="title" value={exp.title || ''} onChange={(e) => handleNestedChange('experience', index, e)} readOnly={!isEditing} /></div>
+                  <div><Label>Company</Label><Input name="company" value={exp.company || ''} onChange={(e) => handleNestedChange('experience', index, e)} readOnly={!isEditing} /></div>
+                  <div><Label>Description</Label><Textarea name="description" value={exp.description || ''} onChange={(e) => handleNestedChange('experience', index, e)} readOnly={!isEditing} /></div>
                 </div>
               ))}
-              <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Experience
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Projects */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Award className="h-5 w-5 mr-2" />
-                Projects
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {projects.map((project, index) => (
-                <div key={index} className="border rounded-lg p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{project.name}</h3>
-                      <p className="text-sm text-gray-700 mt-1">{project.description}</p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button variant="ghost" size="sm" asChild>
-                        <a href={project.link} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Project
-              </Button>
+              {isEditing && <Button variant="outline" size="sm" onClick={() => addSectionItem('experience')}><Plus className="h-4 w-4 mr-2" />Add Experience</Button>}
             </CardContent>
           </Card>
         </div>
-
-        {/* Sidebar */}
+        
         <div className="space-y-6">
-          {/* Profile Photo & Quick Info */}
           <Card>
             <CardContent className="p-6 text-center">
-              <div className="w-24 h-24 bg-gradient-to-r from-navy-600 to-teal-600 rounded-full mx-auto mb-4 flex items-center justify-center text-white text-2xl font-bold">
-                JD
-              </div>
-              <h2 className="text-xl font-bold text-navy-800">John Doe</h2>
-              <p className="text-gray-600">Computer Science Student</p>
+              <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} className="hidden" accept="image/png, image/jpeg" />
+              {profile.profilePictureUrl ? (
+                <img src={profile.profilePictureUrl} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4 object-cover" />
+              ) : (
+                <div className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center text-gray-500 text-2xl font-bold">
+                  {profile.firstName.charAt(0)}{profile.lastName.charAt(0)}
+                </div>
+              )}
+              <h2 className="text-xl font-bold">{profile.firstName} {profile.lastName}</h2>
+              <p className="text-gray-600">{profile.profileTitle || 'Student'}</p>
               <div className="flex items-center justify-center text-sm text-gray-500 mt-2">
-                <MapPin className="h-4 w-4 mr-1" />
-                San Francisco, CA
+                <MapPin className="h-4 w-4 mr-1" /> {profile.location || 'Location not set'}
               </div>
-              <Button className="w-full mt-4" size="sm">
-                Upload Photo
-              </Button>
+              {isEditing && (
+                <Button className="w-full mt-4" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  Upload Photo
+                </Button>
+              )}
             </CardContent>
           </Card>
-
-          {/* Skills */}
           <Card>
-            <CardHeader>
-              <CardTitle>Skills</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Skills</CardTitle></CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {skills.map((skill, index) => (
-                  <Badge key={index} variant="secondary">
-                    {skill}
-                  </Badge>
+                {profile.skills?.map((skill, index) => (
+                  <Badge key={index} variant="secondary">{skill}</Badge>
                 ))}
               </div>
-              <Button variant="outline" size="sm" className="w-full mt-4">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Skill
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Contact Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Contact</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center text-sm">
-                <Mail className="h-4 w-4 mr-2 text-gray-500" />
-                <span>john.doe@university.edu</span>
-              </div>
-              <div className="flex items-center text-sm">
-                <Phone className="h-4 w-4 mr-2 text-gray-500" />
-                <span>+1 (555) 123-4567</span>
-              </div>
-              <div className="flex items-center text-sm">
-                <ExternalLink className="h-4 w-4 mr-2 text-gray-500" />
-                <a href="#" className="text-primary hover:underline">LinkedIn Profile</a>
-              </div>
-              <div className="flex items-center text-sm">
-                <ExternalLink className="h-4 w-4 mr-2 text-gray-500" />
-                <a href="#" className="text-primary hover:underline">GitHub Profile</a>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Profile Visibility */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Profile Visibility</span>
-                <Badge variant="accent">Public</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Available for Work</span>
-                <Badge className="bg-green-100 text-green-800">Yes</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Profile Views</span>
-                <span className="text-sm font-semibold">48 this month</span>
-              </div>
-              <Button variant="outline" size="sm" className="w-full">
-                Privacy Settings
-              </Button>
+              {isEditing && <Button variant="outline" size="sm" className="w-full mt-4"><Plus className="h-4 w-4 mr-2" />Manage Skills</Button>}
             </CardContent>
           </Card>
         </div>
       </div>
     </div>
-  )
+  );
 }
